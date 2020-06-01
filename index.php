@@ -21,7 +21,9 @@
          $(document).ready(function(){
 
           var selectedYear = 2019;
+          var selectedYearTo = 0;
           var selectedTeam = "";
+
 
           // When year is selected, retreive MLB teams that were active for that year and populate team dropdown.
           $("#yearsDropdown").change(function(){
@@ -47,6 +49,32 @@
               });
           });
 
+          // When year is selected, retreive MLB teams that were active for that year and populate team dropdown.
+          $("#yearsDropdownTo").change(function(){
+              selectedYearTo = $(this).val();
+
+              /*
+              $.ajax({
+                  url: 'getTeams.php',
+                  type: 'post',
+                  data: {yearStart: selectedYear, yearEnd:selectedYear},
+                  dataType: 'json',
+                  success:function(response){
+                      var len = response.length;
+
+                      $("#teamsDropdown").empty();
+                      $("#teamsDropdown").append("<option value='0'>- Select -</option>")
+                      for( var i = 0; i<len; i++){
+                          var name = response[i];
+                          
+                          $("#teamsDropdown").append("<option value='" + name + "'>" + name + "</option>");
+
+                      }
+                  }
+              });
+              */
+          });
+
           // Set selected team
           $("#teamsDropdown").change(function(){
               selectedTeam = $(this).val();
@@ -57,17 +85,19 @@
           $("#Submit").click(function(){
                console.log(selectedTeam + " " + selectedYear);
 
-               // Check which checkboxes are selected (php needs 1s and 0s for bool)
+               /* Check which checkboxes are selected (php needs 1s and 0s for bool)
                var power = $("#powerCheckbox").is(":checked") ? 1 : 0;
-               var contact = $("#contactCheckbox").is(":checked")? 1 : 0;;
-               var speed = $("#speedCheckbox").is(":checked")? 1 : 0;;
-               var eye= $("#eyeCheckbox").is(":checked")? 1 : 0;;
-               console.log(power + " " + contact + " " +  speed+ " " + eye);
+               var contact = $("#contactCheckbox").is(":checked")? 1 : 0;
+               var speed = $("#speedCheckbox").is(":checked")? 1 : 0;
+               var eye= $("#eyeCheckbox").is(":checked")? 1 : 0; */
+               var fantasy = $("#fantasyCheckbox").is(":checked")? 1 : 0;
+               console.log(power + " " + contact + " " +  speed+ " " + eye + " "+ fantasy);
 
               $.ajax({
                   url: 'getPreferredPlayer.php',
                   type: 'post',
-                  data: {team: selectedTeam, year:selectedYear, power:power, contact:contact, eye:eye, speed:speed},
+                  data: {team: selectedTeam, year:selectedYear, yearTo: selectedYearTo,
+                    power:power, contact:contact, eye:eye, speed:speed, fantasy:fantasy},
                   dataType: 'html',
                   success:function(html){
                      console.log(html)
@@ -82,21 +112,29 @@
 
       <?php
          include 'DBConnection.php';
+         //include 'HTMLHelpers.php';
 
          // Create connection
          $db = new BaseballDB();
+         $years = $db->get_years();
       ?>
 
       <h1> Welcome to PHP Baseball Player Retreiver!</h1>
 
-      <!-- Year dropdown menu-->
+      <!-- Year dropdown menus -->
       <div>
          <label for="yearsDropdown">Choose a year:</label>
          <select id='yearsDropdown' name='yearsDropdown'>"
             <option value="0">- Select -</option>
             <?php
-              $years = $db->get_years();
-              $db->populate_drop_down($years);
+              HTMLHelpers::populate_drop_down($years);
+            ?>
+         </select>
+         <label for="yearsDropdownTo"> to </label>
+         <select id='yearsDropdownTo' name='yearsDropdownTo'>"
+            <option value="0">- Select -</option>
+            <?php
+              HTMLHelpers::populate_drop_down($years);
             ?>
          </select>
       </div>
@@ -123,7 +161,9 @@
         <input type="checkbox" id="speedCheckbox" name="speedCheckbox" value="Speed">
         <label for="speedCheckbox"> Speed </label><br>
         <input type="checkbox" id="eyeCheckbox" name="eyeCheckbox" value="Eye">
-        <label for="eyeCheckbox"> Eye </label><br><br>
+        <label for="eyeCheckbox"> Eye </label><br>
+        <input type="checkbox" id="fantasyCheckbox" name="fantasyCheckbox" value="Fantasy">
+        <label for="fantasyCheckbox"> Fantasy ROTO (R, HR, RBI, SB, AVG) </label><br><br>
         <input type="submit" id="Submit" value="Submit"><br><br>
       </div>
 

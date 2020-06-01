@@ -1,10 +1,13 @@
 <?php
+include 'HTMLHelpers.php';
+
 // Contains connection to baseball database, performs queries, and prints results in table.
 class BaseballDB
 {
    public $conn;
    public $MIN_AB = 300;
    public $category_to_stat_map = array("speed" => "SB", "power" => "HR", "contact" => "AVG", "eye" => "OBP");
+   public $fantasy_roto_cats = array("R", "HR", "RBI", "SB", "AVG");
 
    // Creates a MySQLi connection to the baseball db.
    function __construct()
@@ -45,8 +48,8 @@ class BaseballDB
    {
       $sql= "SELECT t.name
             from teams t
-            where t.yearID >= " . $yearStart. " and t.yearID <= " . $yearEnd .
-            " group by t.name";
+            where t.yearID >= $yearStart and t.yearID <= $yearEnd
+            group by t.name";
 
       $result = $this->conn->query($sql);
 
@@ -59,48 +62,29 @@ class BaseballDB
    }
 
    // Gets the preferred player on a team for a given year, given the selected categories.
-   public function get_preferred_player($team, $year, $power, $contact, $speed, $eye)
+   public function get_preferred_player_from_cats($team, $year, $yearTo, $categories)
    {
+
       // If single category just do query on that category.
-      // If multiple categories average out the rank on the team and show the two lowest averages (1st in avg, 3rd in HR, etc.)
-      if ($power && !$contact && !$speed && !$eye)
+      // If multiple categories average out the rank on the team
+      if (count($categories) == 1)
       {
-         $result = $this->most_power_on_team($team, $year, 5);
-         $this->print_results_as_table($result);
-         return $result;
-      }
-      else if (!$power && $contact && !$speed && !$eye)
-      {
-         $result = $this->best_contact_hitter_on_team($team, $year, 5);
-         $this->print_results_as_table($result);
-         return $result;
-      }
-      else if (!$power && !$contact && $speed && !$eye)
-      {
-         $result = $this->most_speed_on_team($team, $year, 5);
-         $this->print_results_as_table($result);
-         return $result;
-      }
-      else if (!$power && !$contact && !$speed && $eye)
-      {
-         $result = $this->best_eye_on_team($team, $year, 5);
-         $this->print_results_as_table($result);
+         $result = $this->query_baseball_stats($team, $year, $yearTo, $categories[0], 10);
+         HTMLHelpers::print_results_as_table($result);
          return $result;
       }
       else
       {
-        // If multiple categories average out the rank on the team and sort by average rank
-         $categories = $this->get_categories($power, $speed, $contact, $eye);
-         
-         $result = $this->order_players_based_on_multiple_categories($team, $year, $categories);
-         $this->print_2Darray_as_table($result);
-
+         // If multiple categories average out the rank on the team and sort by average rank
+         $result = $this->order_players_based_on_multiple_categories($team, $year, $yearTo, $categories);
+         HTMLHelpers::print_2Darray_as_table($result);
+         echo "* Minimum $this->MIN_AB ABs";
          return $result;
       }
    }
 
    // Returns an array of stat categories corresponding to the selected check boxes.
-   public function get_categories($power, $speed, $contact, $eye)
+   public function get_categories($power, $speed, $contact, $eye, $fantasy)
    {
       $categories = array();
       if ($power)
@@ -122,18 +106,24 @@ class BaseballDB
       {
          $categories[] = "OBP";
       }
+
+      if ($fantasy)
+      {
+         $categories = $this->fantasy_roto_cats;
+      }
       
       return $categories;
    }
 
    // Builds ranks table
    // categories is an array of stat category ("SB", "HR", "OBP", "SB") 
-   public function order_players_based_on_multiple_categories($team, $year, $categories)
+   public function order_players_based_on_multiple_categories($team, $year, $yearTo, $categories)
    {
       $player_rank_map = array();
+      $includeYear = is_numeric($yearTo) && $yearTo > $year;
 
       // Gets stats as associative array.
-      $stats = $this->get_player_stats_from_team($team, $year);
+      $stats = $this->get_player_stats_from_team($team, $year, $yearTo);
       $stats = $stats->fetch_all(MYSQLI_ASSOC);
 
       // Sort stats by each category and add their rank into the players.
@@ -147,7 +137,7 @@ class BaseballDB
          for ($i = 0; $i < count($stats); $i++)
          {
             $player = $stats[$i];
-            $key = $player["playerID"];
+            $key = $player["playerID"].$player["yearID"];
             $rank = $i + 1;
 
             // If key exists in map add to it otherwise create entry for player
@@ -158,6 +148,11 @@ class BaseballDB
             }
             else
             {
+               if ($includeYear)
+               {
+                  $player_rank_map[$key]["Year"] = $player["Year"];
+               }
+
                $player_rank_map[$key]["Name"] = $player["First Name"] . " " . $player["Last Name"];
                $player_rank_map[$key]["Average Rank"] = $rank;
                $player_rank_map[$key][$category] = $player[$category] . " ($rank)";
@@ -179,183 +174,66 @@ class BaseballDB
       return $player_rank_map;
    }
 
-   // Gets player with the most steals on a team for a given year.
-   public function most_speed_on_team($team, $year, $limit)
+   // Build query by passed in stat.
+   public function query_baseball_stats($team, $year, $yearTo, $stat, $limit)
    {
-      $sql= "SELECT p.nameFirst as 'First Name', p.nameLast as 'Last Name', b.SB
+      $stat = "b." . $stat;
+
+      $showYear = "";
+
+      if (!is_numeric($yearTo) || $yearTo <= $year)
+      {
+         $yearTo = $year;
+      }
+      else
+      {
+         $showYear = "b.yearID as 'Year',";
+      }
+
+      // If no team is selected get stats for all players, dont add team to where clause
+      $teamWhereClause = $team != "" && $team != "0" ? "t.name = '$team' and " : "";
+
+      $sql= "SELECT $showYear p.nameFirst as 'First Name', p.nameLast as 'Last Name', $stat
             from batting b 
             join people p on p.playerID = b.playerID
             join teams t on b.teamID = t.teamID and b.yearID = t.yearID
-            where t.name = '$team' and t.yearID = $year
-            order by b.SB desc 
+            where $teamWhereClause t.yearID >= $year and t.yearID <= $yearTo and b.AB > $this->MIN_AB
+            order by $stat desc 
             limit $limit";
 
       $result = $this->conn->query($sql);
 
       return $result;
+
    }
 
-   // Gets player with highest AVG on a team for a given year.
-   public function best_contact_hitter_on_team($team, $year, $limit)
+   // Gets the batting stats for a team for a particular year 
+   public function get_player_stats_from_team($team, $year, $yearTo)
    {
-      $sql= "SELECT p.nameFirst as 'First Name', p.nameLast as 'Last Name', b.AVG
-            from batting b 
-            join people p on p.playerID = b.playerID
-            join teams t on b.teamID = t.teamID and b.yearID = t.yearID
-            where t.name = '$team' and t.yearID = $year and b.AB > $this->MIN_AB
-            order by b.AVG desc 
-            limit $limit";
+      $showYear = "";
 
-      $result = $this->conn->query($sql);
+      if (!is_numeric($yearTo) || $yearTo <= $year)
+      {
+         $yearTo = $year;
+      }
+      else
+      {
+         $showYear = "b.yearID as 'Year',";
+      }
 
-      return $result;
-   }
+      // If no team is selected get stats for all players, dont add team to where clause
+      $teamWhereClause = $team != "" && $team != "0" ? "t.name = '$team' and " : "";
 
-   // Gets player with highest OBP on a team for a given year (alternatively could just use walks)
-   public function best_eye_on_team($team, $year, $limit)
-   {
-      $sql= "SELECT p.nameFirst as 'First Name', p.nameLast as 'Last Name', b.OBP
-            from batting b 
-            join people p on p.playerID = b.playerID
-            join teams t on b.teamID = t.teamID and b.yearID = t.yearID
-            where t.name = '$team' and t.yearID = $year and b.AB > $this->MIN_AB
-            order by b.OBP desc 
-            limit $limit";
-
-      $result = $this->conn->query($sql);
-
-      return $result;
-   }
-
-   // Gets player with the most home runs on a team for a given year.
-   public function most_power_on_team($team, $year, $limit)
-   {
-      $sql= "SELECT p.nameFirst as 'First Name', p.nameLast as 'Last Name', b.HR
-            from batting b 
-            join people p on p.playerID = b.playerID
-            join teams t on b.teamID = t.teamID and b.yearID = t.yearID
-            where t.name = '$team' and t.yearID = $year
-            order by b.HR desc 
-            limit $limit";
-
-      $result = $this->conn->query($sql);
-
-      return $result;
-   }
-
-   // Gets the batting stats for a team for a particular year (for players w/ > 350 ABs)
-   public function get_player_stats_from_team($team, $year)
-   {
-      $sql= "SELECT p.nameFirst as 'First Name', p.nameLast as 'Last Name', b.*
+      $sql= "SELECT $showYear p.nameFirst as 'First Name', p.nameLast as 'Last Name', b.*
                from batting b 
                join people p on p.playerID = b.playerID
                join teams t on b.teamID = t.teamID and b.yearID = t.yearID
-               where t.name = '$team' and t.yearID = $year and b.AB > $this->MIN_AB";
+               where $teamWhereClause t.yearID >= $year and t.yearID <= $yearTo and b.AB > $this->MIN_AB";
 
       $result = $this->conn->query($sql);
 
       return $result;
    }
 
-   // Populate options of a drop down list from an array
-   public function populate_drop_down($options)
-   {
-        foreach ($options as $option)
-        {
-          echo "<option value='$option'>$option</option>";         
-        }
-   }
-
-   // Prints the database result as a HTML table
-   public function print_results_as_table($result)
-   {
-      // If there are results build a table
-      if ($result->num_rows > 0) {
-         $tableCreated = false;
-
-         $columns = array();
-
-         // Output data of each row
-         while($row = $result->fetch_assoc()) {
-            // Create table if doesn't exist
-            if (!$tableCreated)
-            {
-               echo "<table style='width:50%'><tr>";
-
-              // Gets columns from first result.
-              $columns = array_keys($row);
-              foreach ($columns as $column)
-              {
-                  echo "<th>$column</th>";
-              }
-
-              echo "</tr>";
-
-              $tableCreated = true;
-            }
-
-            echo "<tr>";
-
-            foreach ($columns as $column)
-            {
-               echo "<td>" . $row[$column] . "</td>";
-            }
-            echo "</tr>";
-         }
-
-         echo "</table>";
-      } 
-      // If no results print 0 results instead of a table.
-      else {
-         echo "0 results";
-      }
-   }
-
-
-   // Prints the database result as a HTML table
-   public function print_2Darray_as_table($result)
-   {
-      // If there are results build a table
-      if (count($result) > 0) {
-         $tableCreated = false;
-
-         $columns = array();
-
-         // Output data of each row
-         foreach ($result as $row) {
-            // Create table if doesn't exist
-            if (!$tableCreated)
-            {
-               echo "<table style='width:50%'><tr>";
-
-              // Gets columns from first result.
-              $columns = array_keys($row);
-              foreach ($columns as $column)
-              {
-                  echo "<th>$column</th>";
-              }
-
-              echo "</tr>";
-
-              $tableCreated = true;
-            }
-
-            echo "<tr>";
-
-            foreach ($columns as $column)
-            {
-               echo "<td>" . $row[$column] . "</td>";
-            }
-            echo "</tr>";
-         }
-
-         echo "</table>";
-         echo "* Minimum " . $this->MIN_AB . " ABs";
-      } 
-      // If no results print 0 results instead of a table.
-      else {
-         echo "0 results";
-      }
-   }
 }
 ?>
