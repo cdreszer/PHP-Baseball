@@ -117,4 +117,36 @@
       return $result;
    }
 
+      // Returns an array of stat categories corresponding to the selected check boxes.
+   public function get_categories($power, $speed, $contact, $eye, $fantasy)
+   {
+      $categories = array();
+      if ($power)
+      {
+         $categories[] = "HR";
+      }
+
+      if ($speed)
+      {
+         $categories[] = "SB";
+      }
+
+      if ($contact)
+      {
+         $categories[] = "AVG";
+      }
+
+      if ($eye)
+      {
+         $categories[] = "OBP";
+      }
+
+      if ($fantasy)
+      {
+         $categories = $this->fantasy_roto_cats;
+      }
+      
+      return $categories;
+   }
+
 ?>

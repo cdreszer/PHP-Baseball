@@ -23,11 +23,13 @@
           var selectedYear = 2019;
           var selectedYearTo = 0;
           var selectedTeam = "";
-
+          var statCheckboxes = ["R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS"];
+          var isHitter = 1;
 
           // When year is selected, retreive MLB teams that were active for that year and populate team dropdown.
           $("#yearsDropdown").change(function(){
               selectedYear = $(this).val();
+              console.log(selectedYear);
 
               $.ajax({
                   url: 'getTeams.php',
@@ -52,12 +54,12 @@
           // When year is selected, retreive MLB teams that were active for that year and populate team dropdown.
           $("#yearsDropdownTo").change(function(){
               selectedYearTo = $(this).val();
+              console.log(selectedYear + " - " + selectedYearTo);
 
-              /*
               $.ajax({
                   url: 'getTeams.php',
                   type: 'post',
-                  data: {yearStart: selectedYear, yearEnd:selectedYear},
+                  data: {yearStart: selectedYear, yearEnd:selectedYearTo},
                   dataType: 'json',
                   success:function(response){
                       var len = response.length;
@@ -72,7 +74,36 @@
                       }
                   }
               });
-              */
+              
+          });
+
+          // When year is selected, retreive MLB teams that were active for that year and populate team dropdown.
+          $("#hitter, #pitcher").change(function(){
+
+              if ($("#hitter").is(":checked"))
+              {
+                statCheckboxes = ["R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS"];
+                isHitter = 1;
+              }
+              else
+              {
+                statCheckboxes = ["W", "L", "SO", "ERA", "BAOpp"];
+                isHitter = 0;
+              }
+
+              console.log(statCheckboxes.toString());
+
+              $.ajax({
+                  url: 'getCheckboxes.php',
+                  type: 'post',
+                  data: {stats: statCheckboxes, fantasy:isHitter},
+                  dataType: 'html',
+                  success:function(html){
+                     console.log(html)
+                     $("#checkboxes").empty();
+                     $("#checkboxes").append(html);
+                  }
+              });
           });
 
           // Set selected team
@@ -85,19 +116,33 @@
           $("#Submit").click(function(){
                console.log(selectedTeam + " " + selectedYear);
 
-               /* Check which checkboxes are selected (php needs 1s and 0s for bool)
-               var power = $("#powerCheckbox").is(":checked") ? 1 : 0;
-               var contact = $("#contactCheckbox").is(":checked")? 1 : 0;
-               var speed = $("#speedCheckbox").is(":checked")? 1 : 0;
-               var eye= $("#eyeCheckbox").is(":checked")? 1 : 0; */
-               var fantasy = $("#fantasyCheckbox").is(":checked")? 1 : 0;
-               console.log(power + " " + contact + " " +  speed+ " " + eye + " "+ fantasy);
+               var categories = [];
 
+               // Check which stat checkboxes are selected
+               // If fantasy is checked ignore all other checkboxes
+               if (isHitter && $("#fantasyCheckbox").is(":checked"))
+               {
+                  categories = ["R", "HR", "RBI", "SB", "AVG"];
+               }
+               else
+               {
+                   // Checks to see which stat category is selected.
+                   statCheckboxes.forEach(stat =>
+                   {
+                      var id = "#" + stat + "Checkbox";
+                      if ($(id).is(":checked"))
+                      {
+                        categories.push(stat);
+                      }
+                   });
+               }
+               console.log(categories.toString());
+
+              // Send ajax request to get preferred player based on selected categories.
               $.ajax({
                   url: 'getPreferredPlayer.php',
                   type: 'post',
-                  data: {team: selectedTeam, year:selectedYear, yearTo: selectedYearTo,
-                    power:power, contact:contact, eye:eye, speed:speed, fantasy:fantasy},
+                  data: {team: selectedTeam, year:selectedYear, yearTo: selectedYearTo, categories:categories, isHitter:isHitter},
                   dataType: 'html',
                   success:function(html){
                      console.log(html)
@@ -154,16 +199,17 @@
       <!-- Checkboxes of what the user prefers in a player -->
       <div>
         <h3>What do you prefer in a player?</h3>
-        <input type="checkbox" id="powerCheckbox" name="powerCheckbox" value="Power" checked>
-        <label for="powerCheckbox"> Power </label><br>
-        <input type="checkbox" id="contactCheckbox" name="contactCheckbox" value="Contact">
-        <label for="contactCheckbox"> Contact </label><br>
-        <input type="checkbox" id="speedCheckbox" name="speedCheckbox" value="Speed">
-        <label for="speedCheckbox"> Speed </label><br>
-        <input type="checkbox" id="eyeCheckbox" name="eyeCheckbox" value="Eye">
-        <label for="eyeCheckbox"> Eye </label><br>
-        <input type="checkbox" id="fantasyCheckbox" name="fantasyCheckbox" value="Fantasy">
-        <label for="fantasyCheckbox"> Fantasy ROTO (R, HR, RBI, SB, AVG) </label><br><br>
+        <input type="radio" id="hitter" name="position" value="hitter" checked>
+        <label for="male">Hitter</label>
+        <input type="radio" id="pitcher" name="position" value="pitcher">
+        <label for="pitcher">Pitcher</label><br><br>
+          <div id="checkboxes">
+          <?php
+              $stats = array("R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS");
+              //$stats = array("W", "L", "SO", "ERA", "BAOpp");
+              HTMLHelpers::populate_checkboxes($stats, true);
+          ?>
+        </div>
         <input type="submit" id="Submit" value="Submit"><br><br>
       </div>
 

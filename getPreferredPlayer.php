@@ -7,19 +7,15 @@ $db = new BaseballDB();
 $team = $_POST['team'];
 $year = $_POST['year'];
 $yearTo = $_POST['yearTo'];
+$isHitter = $_POST['isHitter'];
 
-// Category preferences (true / false)
-$power = $_POST['power'];
-$speed = $_POST['speed'];
-$contact = $_POST['contact'];
-$eye = $_POST['eye'];
-$fantasy = $_POST['fantasy'];
+$categories = $_POST['categories'];
 
 // Get categories from checkboxes
-$categories = $db->get_categories($power, $speed, $contact, $eye, $fantasy);
+//$categories = $db->get_categories($power, $speed, $contact, $eye, $fantasy);
 
 // Result
-$result = $db->get_preferred_player_from_cats($team, $year, $yearTo, $categories);
+$result = $db->get_preferred_player_from_cats($team, $year, $yearTo, $categories, $isHitter);
 
 $db->conn->close();
 ?>

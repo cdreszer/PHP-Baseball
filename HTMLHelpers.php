@@ -1,6 +1,35 @@
 <?php
 class HTMLHelpers
 {
+   // Populates the checkboxes with the array of stats passed in
+   // If fantasy is true, adds the fantasy baseball roto checkbox button
+   public static function populate_checkboxes($stats, $fantasy)
+   {
+      $i = 0;
+
+      foreach ($stats as $stat)
+      {
+       $id = $stat . "Checkbox";
+       echo "<input type='checkbox' id='$id' name='$id' value='$stat' >
+             <label for='$id'> $stat </label>";
+
+       // Depending if one checkboxes all in one line, two to a line, one to a line
+       if ($i++ % 2 != 0)
+       {
+         //echo '<br>';
+       }
+      }
+
+      // Adds roto fantasy checkbox
+      if ($fantasy)
+      {
+         echo "<input type='checkbox' id='fantasyCheckbox' name='fantasyCheckbox' value='Fantasy'>
+          <label for='fantasyCheckbox'> Fantasy ROTO (R, HR, RBI, SB, AVG) </label>";
+      }
+
+      echo "<br><br>";
+   }
+
    // Populate options of a drop down list from an array
    public static function populate_drop_down($options)
    {
