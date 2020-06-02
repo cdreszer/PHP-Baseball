@@ -9,6 +9,7 @@
 
    If user chooses multiple categories average player's rank in category and player with lowest average is displayed.
    ... maybe add in some images for categories and player results
+
 -->
 <html>
    <head>
@@ -25,6 +26,7 @@
           var selectedTeam = "";
           var statCheckboxes = ["R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS"];
           var isHitter = 1;
+          var isSimple = 1;
 
           // When year is selected, retreive MLB teams that were active for that year and populate team dropdown.
           $("#yearsDropdown").change(function(){
@@ -75,6 +77,17 @@
                   }
               });
               
+          });
+
+          $("#simple, #advanced").change(function(){
+              if ($("#simple").is(":checked"))
+              {
+                isSimple = 1;
+              }
+              else
+              {
+                isSimple = 0;
+              }
           });
 
           // When year is selected, retreive MLB teams that were active for that year and populate team dropdown.
@@ -142,7 +155,7 @@
               $.ajax({
                   url: 'getPreferredPlayer.php',
                   type: 'post',
-                  data: {team: selectedTeam, year:selectedYear, yearTo: selectedYearTo, categories:categories, isHitter:isHitter},
+                  data: {team: selectedTeam, year:selectedYear, yearTo: selectedYearTo, categories:categories, isHitter:isHitter, isSimple:isSimple},
                   dataType: 'html',
                   success:function(html){
                      console.log(html)
@@ -162,6 +175,7 @@
          // Create connection
          $db = new BaseballDB();
          $years = $db->get_years();
+         $db->conn->close();
       ?>
 
       <h1> Welcome to PHP Baseball Player Retreiver!</h1>
@@ -196,20 +210,33 @@
          </select>
       </div>
 
-      <!-- Checkboxes of what the user prefers in a player -->
+      
       <div>
         <h3>What do you prefer in a player?</h3>
+
+        <!-- Hitter / Pitcher Radio Buttons-->
         <input type="radio" id="hitter" name="position" value="hitter" checked>
         <label for="male">Hitter</label>
         <input type="radio" id="pitcher" name="position" value="pitcher">
         <label for="pitcher">Pitcher</label><br><br>
-          <div id="checkboxes">
-          <?php
-              $stats = array("R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS");
-              //$stats = array("W", "L", "SO", "ERA", "BAOpp");
-              HTMLHelpers::populate_checkboxes($stats, true);
-          ?>
+
+        <!-- Checkboxes of what the user prefers in a player -->
+        <div id="checkboxes">
+        <?php
+            // Populate stat checkboxes with hitter stats as default.
+            $stats = array("R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS");
+            //$stats = array("W", "L", "SO", "ERA", "BAOpp");
+            HTMLHelpers::populate_checkboxes($stats, true);
+        ?>
         </div>
+
+        <!-- Simple / Advanced Ranking Radio Buttons-->
+        <input type="radio" id="simple" name="ranking" value="simple" checked>
+        <label for="simple">Simple Ranking</label>
+        <input type="radio" id="advanced" name="ranking" value="advanced">
+        <label for="advanced">Advanced Ranking</label><br><br>
+
+        <!-- Submit button -->
         <input type="submit" id="Submit" value="Submit"><br><br>
       </div>
 
